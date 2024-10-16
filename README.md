@@ -14,18 +14,18 @@
 @Override
 	public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
 		return getAccessToken(
-					exchange.getRequest().getHeaders().get(HEADER_ID).getFirst())
-				.flatMap(accessToken -> {
-					log.debug("AccessToken ===> {}",accessToken);
+			exchange.getRequest().getHeaders().get(HEADER_ID).getFirst())
+		.flatMap(accessToken -> {
+			log.debug("AccessToken ===> {}",accessToken);
 
-					exchange.getRequest().mutate()
-							.header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-							.build();
+			exchange.getRequest().mutate()
+					.header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+					.build();
 
-					log.debug("Response ===> {}",exchange.getResponse());
-					return chain.filter(exchange);
-				});
-	}
+			log.debug("Response ===> {}",exchange.getResponse());
+			return chain.filter(exchange);
+		});
+}
 ```
 
 ```xml
