@@ -147,4 +147,3 @@ public interface DeviceClient {
 
 
 
-<img width="1194" alt="image" src="https://github.com/user-attachments/assets/2ab1063e-2ea4-45ea-893c-9cd44724539c">
