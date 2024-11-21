@@ -26,6 +26,34 @@
 			return chain.filter(exchange);
 		});
 }
+
+
+//코드 일부 수정발췌
+//Gateway에 들어온 요청을 Authorization server로 보내 인증여부 확인을 받도록 하는 부분
+private Mono<String> authenticationWithUserCredentialsToken(String accountId, ServerWebExchange exchange) {
+	MultiValueMap<String, String> formData = new LinkedMultiValueMap<>();
+	formData.add("accountId", accountId);
+	formData.add("grant_type", GRANT_TYPE); //custom client credentials grant type
+
+	log.info("Get user uuid ===> {}", accountId);
+
+	return sslWebClient.baseUrl(authServerPath).build()
+			.post()
+			.uri("/oauth2/token")
+			.header(HttpHeaders.CONTENT_TYPE, "application/x-www-form-urlencoded")
+			.headers(header -> header.setBasicAuth(clientId, clientSecret))
+			.bodyValue(formData)
+			.retrieve()
+			.onStatus(status -> status.is4xxClientError() || status.is5xxServerError(), clientResponse -> { //header값이 제대로 보내지지 않았을 경우 에러처리
+				ProblemDetail detail =  ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Missing required header: " + HEADER_ACCOUNT_ID);
+				detail.setTitle("User account Id does not exist.");
+				detail.setInstance(exchange.getRequest().getURI());
+
+				return (getVoidMono(exchange, detail).then(Mono.error(new RuntimeException("User account Id does not exist."))));
+			})
+			.bodyToMono(AuthResponse.class)
+			.map(AuthResponse::accessToken);
+	}
 ```
 
 ```xml
@@ -145,5 +173,42 @@ public interface DeviceClient {
                            @RequestBody Map<String, clientRequest> nameList);
 ```
 
+
+-------------
+ <h3> 4. Authorization Service</h3>
+     
+     - MSA 내부적으로 인증절차 구조를 만들기 위한 서비스 모듈
+     - Client credentials 과 Custom Client credentials 방법을 사용하였음
+     
+ 
+
+```java
+
+//코드 수정 발췌
+//SecurityConfig에서 custom client credential 방법을 적용하기 위해 [OAuth2AccountIdClientAuthenticationConverter] 설정하는 부분
+authorizationServerConfigurer
+	.tokenEndpoint(oAuth2TokenEndpointConfigurer ->
+		oAuth2TokenEndpointConfigurer
+				.accessTokenRequestConverter(
+						new DelegatingAuthenticationConverter(Arrays.asList(
+								new OAuth2AccountIdClientAuthenticationConverter(),
+								new OAuth2ClientCredentialsAuthenticationConverter()
+						))
+				)
+	);
+
+
+//custom provider를 적용해주는 부분
+private void addOAuth2AuthorizationCodeAuthenticationProvider(HttpSecurity http) {
+	OAuth2AuthorizationService authorizationService = http.getSharedObject(OAuth2AuthorizationService.class);
+	OAuth2TokenGenerator<? extends OAuth2Token> tokenGenerator = http.getSharedObject(OAuth2TokenGenerator.class);
+
+	OAuth2AccountIdClientAuthenticationProvider userClientAuthenticationProvider =
+			new OAuth2AccountIdClientAuthenticationProvider(authorizationService, tokenGenerator, accountService);
+
+	// This will add new authentication provider in the list of existing authentication providers.
+	http.authenticationProvider(userClientAuthenticationProvider);
+}
+```
 
 
