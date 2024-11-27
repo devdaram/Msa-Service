@@ -240,6 +240,9 @@ public class SdnClientHttpRequestInterceptor implements ClientHttpRequestInterce
 ```
 
 ```java
+/**
+* controller 에서 message를 publish
+*/
  @Operation(summary = "생성")
     @PostMapping("/uri")
     public APIResponse<String> createTenant(@RequestBody @Valid Request request,
